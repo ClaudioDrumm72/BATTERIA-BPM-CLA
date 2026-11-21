@@ -1,0 +1,547 @@
+<title>Batteria BPM</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1317">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: schermata unica da telefono, contenuto in colonna e barra di schede in basso */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --fg: #14181d;
+  --muted: #5c6773;
+  --line: #d5dbe1;
+  --accent: #d93a2f;
+  --accent-fg: #ffffff;
+  --ok: #1a8a4a;
+  --warn: #b86e00;
+  --bad: #d93a2f;
+  --font-display: "Space Grotesk", ui-rounded, system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1317; --surface: #181d23; --fg: #eceff2; --muted: #98a3ae; --line: #2a3139;
+    --accent: #ff6a5c; --accent-fg: #1a0a08; --ok: #3ddc84; --warn: #f5a524; --bad: #ff6a5c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1317; --surface: #181d23; --fg: #eceff2; --muted: #98a3ae; --line: #2a3139;
+  --accent: #ff6a5c; --accent-fg: #1a0a08; --ok: #3ddc84; --warn: #f5a524; --bad: #ff6a5c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 96px;
+  -webkit-tap-highlight-color: transparent;
+}
+main { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.25rem; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.small { font-size: .85rem; color: var(--muted); }
+.label { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+
+.hero { text-align: center; padding: 18px 0 4px; }
+.bpm {
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(5.5rem, 30vw, 8.5rem);
+  line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+}
+.unit { font-family: var(--font-display); font-size: 1.1rem; letter-spacing: .25em; color: var(--muted); }
+.meter { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 18px 12% 8px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .06s linear; }
+
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 10px 4px; font-variant-numeric: tabular-nums; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: 600; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.big { width: 100%; padding: 16px; font-size: 1.05rem; }
+.btn.stop { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.btn.sm { padding: 6px 10px; font-size: .85rem; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.danger { color: var(--bad); }
+.msg { margin: 0; text-align: center; font-size: .9rem; color: var(--muted); }
+.msg.err { color: var(--bad); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.tap { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
+.tap-num { font-family: var(--font-display); font-weight: 700; font-size: 2.4rem; font-variant-numeric: tabular-nums; line-height: 1; }
+.tap button.pad { width: 96px; height: 96px; border-radius: 50%; border: 0; background: var(--fg); color: var(--bg); font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; letter-spacing: .1em; }
+.tap button.pad:active { transform: scale(.95); }
+
+.rows { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-width: 0; }
+.row + .row { border-top: 1px solid var(--line); }
+.row .grow { flex: 1; min-width: 0; }
+.row .t { font-weight: 600; overflow-wrap: anywhere; }
+.row .num { font-family: var(--font-display); font-weight: 700; font-size: 1.4rem; font-variant-numeric: tabular-nums; text-align: right; line-height: 1.1; }
+.row .num small { display: block; font-family: var(--font-body); font-weight: 400; font-size: .65rem; color: var(--muted); letter-spacing: .08em; }
+.row button.open { all: unset; cursor: pointer; flex: 1; min-width: 0; display: block; }
+.row button.open:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.toolbar .spacer { flex: 1; }
+
+.form { display: flex; flex-direction: column; gap: 10px; }
+.form input, .form textarea { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
+.form textarea { resize: vertical; min-height: 64px; }
+.pill { display: inline-block; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--line); color: var(--muted); vertical-align: middle; }
+
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+nav.tabs button { border: 0; background: transparent; padding: 10px; border-radius: 10px; font-weight: 600; color: var(--muted); }
+nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); }
+
+#live {
+  position: fixed; inset: 0; z-index: 20; background: var(--bg);
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 16px) max(16px, env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+}
+.live { max-width: 520px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; gap: 16px; text-align: center; }
+.live .top { display: flex; justify-content: space-between; align-items: center; }
+.live .title { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.8rem, 8vw, 2.6rem); line-height: 1.1; overflow-wrap: anywhere; text-wrap: balance; }
+.live .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.live .big { font-family: var(--font-display); font-weight: 700; font-size: clamp(3.6rem, 22vw, 5.5rem); line-height: 1; font-variant-numeric: tabular-nums; }
+.live .fb { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; }
+.live .notes { color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.live .mid { margin: auto 0; display: flex; flex-direction: column; gap: 16px; }
+.live .ctrl { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 10px; }
+.live .ctrl .btn { padding: 16px 0; font-size: 1.1rem; }
+.c-ok { color: var(--ok); } .c-warn { color: var(--warn); } .c-bad { color: var(--bad); } .c-mute { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+</style>
+
+<main id="app"></main>
+<nav class="tabs" aria-label="Sezioni">
+  <button data-act="tab" data-v="detect" id="tab-detect">Rileva</button>
+  <button data-act="tab" data-v="lists" id="tab-lists">Scalette</button>
+</nav>
+<div id="live" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- utilità ---------- */
+  var app = document.getElementById("app");
+  var liveEl = document.getElementById("live");
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+
+  /* ---------- dati (salvati nel browser) ---------- */
+  var KEY = "batteria-bpm-v1";
+  function loadState() {
+    try {
+      var d = JSON.parse(localStorage.getItem(KEY));
+      if (d && Array.isArray(d.playlists)) return d;
+    } catch (e) {}
+    return null;
+  }
+  var state = loadState() || {
+    playlists: [{
+      id: uid(), name: "Esempio: serata rock", example: true,
+      songs: [
+        { id: uid(), title: "Back in Black", artist: "AC/DC", bpm: 94, notes: "Intro di chitarra, entri dopo 4 battute" },
+        { id: uid(), title: "Billie Jean", artist: "Michael Jackson", bpm: 117, notes: "Groove fisso, niente fill" },
+        { id: uid(), title: "Seven Nation Army", artist: "The White Stripes", bpm: 124, notes: "" }
+      ]
+    }]
+  };
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function listById(id) { return state.playlists.filter(function (p) { return p.id === id; })[0]; }
+
+  /* ---------- rilevatore di tempo ---------- */
+  function Analyzer() { this.minBPM = 80; this.reset(); }
+  Analyzer.prototype.reset = function () {
+    this.prev = 0; this.flux = []; this.onsets = []; this.lastOnset = -10; this.lastEst = -10; this.smooth = 0;
+  };
+  Analyzer.prototype.process = function (samples, startFrame, sr) {
+    var hop = 512, peak = 0, bpm = null, conf = null;
+    for (var i = 0; i + hop <= samples.length; i += hop) {
+      var sum = 0;
+      for (var j = 0; j < hop; j++) { var s = samples[i + j]; sum += s * s; }
+      var energy = Math.sqrt(sum / hop);
+      if (energy > peak) peak = energy;
+      var t = (startFrame + i + hop) / sr;
+      var r = this.step(energy, t);
+      if (r) { bpm = r.bpm; conf = r.confidence; }
+    }
+    return { level: peak, bpm: bpm, confidence: conf };
+  };
+  Analyzer.prototype.step = function (energy, t) {
+    var diff = Math.max(0, energy - this.prev);
+    this.prev = energy;
+    this.flux.push(diff);
+    if (this.flux.length > 86) this.flux.shift();
+    var mean = 0;
+    for (var k = 0; k < this.flux.length; k++) mean += this.flux[k];
+    mean /= this.flux.length;
+    var threshold = Math.max(mean * 3, 0.006);
+    if (diff > threshold && t - this.lastOnset > 0.12) {
+      this.onsets.push(t);
+      this.lastOnset = t;
+      while (this.onsets.length && t - this.onsets[0] > 8) this.onsets.shift();
+    }
+    if (this.onsets.length && t - this.lastOnset > 3) {
+      this.onsets = []; this.smooth = 0; this.lastEst = t;
+      return { bpm: 0, confidence: 0 };
+    }
+    if (t - this.lastEst >= 0.5) {
+      this.lastEst = t;
+      var e = this.estimate();
+      if (e && e.confidence > 0.25) {
+        if (this.smooth === 0) this.smooth = e.bpm;
+        else if (Math.abs(e.bpm - this.smooth) > 6) this.smooth = 0.5 * this.smooth + 0.5 * e.bpm;
+        else this.smooth = 0.8 * this.smooth + 0.2 * e.bpm;
+        return { bpm: this.smooth, confidence: e.confidence };
+      }
+    }
+    return null;
+  };
+  Analyzer.prototype.estimate = function () {
+    var on = this.onsets;
+    if (on.length < 6) return null;
+    var hist = new Array(402).fill(0), total = 0, min = this.minBPM;
+    for (var a = 0; a < on.length; a++) {
+      for (var k = 1; k <= 3; k++) {
+        var b = a + k;
+        if (b >= on.length) break;
+        var ioi = on[b] - on[a];
+        if (ioi <= 0.05) continue;
+        var bpm = 60 / ioi;
+        while (bpm < min) bpm *= 2;
+        while (bpm >= min * 2) bpm /= 2;
+        var bin = Math.round(bpm), w = 1 / k;
+        for (var d = -1; d <= 1; d++) {
+          var idx = bin + d;
+          if (idx < 0 || idx >= hist.length) continue;
+          var ww = d === 0 ? w : w * 0.5;
+          hist[idx] += ww; total += ww;
+        }
+      }
+    }
+    if (total <= 0) return null;
+    var peakIdx = 0;
+    for (var i = 1; i < hist.length; i++) if (hist[i] > hist[peakIdx]) peakIdx = i;
+    var mass = 0, weighted = 0;
+    for (var q = Math.max(0, peakIdx - 2); q <= Math.min(hist.length - 1, peakIdx + 2); q++) {
+      mass += hist[q]; weighted += hist[q] * q;
+    }
+    if (mass <= 0) return null;
+    return { bpm: weighted / mass, confidence: mass / total };
+  };
+
+  var det = {
+    running: false, bpm: 0, conf: 0, level: 0, error: "", minBPM: 80,
+    analyzer: new Analyzer(), ctx: null, stream: null, node: null, src: null, sink: null, frames: 0, wake: null
+  };
+  function setMin(v) { det.minBPM = v; det.analyzer.minBPM = v; }
+
+  function startDet() {
+    if (det.running) return Promise.resolve();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      det.error = "Questo browser non permette l'accesso al microfono in questa pagina.";
+      refresh(); return Promise.resolve();
+    }
+    return navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    }).then(function (stream) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      det.ctx = new AC();
+      det.stream = stream;
+      det.src = det.ctx.createMediaStreamSource(stream);
+      det.node = det.ctx.createScriptProcessor(2048, 1, 1);
+      det.sink = det.ctx.createGain();
+      det.sink.gain.value = 0;
+      det.analyzer.minBPM = det.minBPM;
+      det.analyzer.reset();
+      det.frames = 0;
+      det.node.onaudioprocess = function (ev) {
+        var data = ev.inputBuffer.getChannelData(0);
+        var out = det.analyzer.process(data, det.frames, det.ctx.sampleRate);
+        det.frames += data.length;
+        onResult(out);
+      };
+      det.src.connect(det.node);
+      det.node.connect(det.sink);
+      det.sink.connect(det.ctx.destination);
+      var p = det.ctx.state === "suspended" ? det.ctx.resume() : Promise.resolve();
+      return p.then(function () {
+        det.running = true; det.error = "";
+        try {
+          if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (w) { det.wake = w; }, function () {});
+        } catch (e) {}
+        refresh();
+      });
+    }).catch(function () {
+      det.error = "Microfono non disponibile o negato. Controlla i permessi di Safari per questo sito. Intanto puoi usare Tap tempo.";
+      refresh();
+    });
+  }
+  function stopDet() {
+    try { if (det.node) { det.node.onaudioprocess = null; det.node.disconnect(); } } catch (e) {}
+    try { if (det.src) det.src.disconnect(); } catch (e) {}
+    try { if (det.stream) det.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    try { if (det.ctx) det.ctx.close(); } catch (e) {}
+    try { if (det.wake) det.wake.release(); } catch (e) {}
+    det.running = false; det.bpm = 0; det.conf = 0; det.level = 0; det.wake = null;
+    refresh();
+  }
+  var lastShown = -1;
+  function onResult(out) {
+    det.level = Math.max(out.level, det.level * 0.85);
+    var changed = false;
+    if (out.bpm !== null) {
+      det.bpm = out.bpm; det.conf = out.confidence || 0;
+      var r = Math.round(det.bpm);
+      if (r !== lastShown) { lastShown = r; changed = true; }
+    }
+    var w = Math.min(det.level * 5, 1) * 100 + "%";
+    var m1 = document.getElementById("lvl"); if (m1) m1.style.width = w;
+    var m2 = document.getElementById("liveLvl"); if (m2) m2.style.width = w;
+    if (changed) updateReadouts();
+  }
+  function updateReadouts() {
+    var r = Math.round(det.bpm), has = det.running && det.bpm > 0;
+    var n = document.getElementById("bpmNum"); if (n) n.textContent = has ? r : "—";
+    var c = document.getElementById("conf");
+    if (c) c.textContent = has ? "Affidabilità " + Math.round(det.conf * 100) + "%" : "";
+    var u = document.getElementById("useDet");
+    if (u) { u.hidden = !has; u.textContent = "Usa il BPM che suoni (" + r + ")"; }
+    if (ui.live) renderLive();
+  }
+
+  /* ---------- tap tempo ---------- */
+  var taps = [], tapBpm = 0;
+  function tap() {
+    var now = performance.now();
+    if (taps.length && now - taps[taps.length - 1] > 2500) taps = [];
+    taps.push(now);
+    if (taps.length > 8) taps.shift();
+    if (taps.length >= 2) tapBpm = 60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1));
+    var el = document.getElementById("tapNum");
+    if (el) el.textContent = tapBpm ? Math.round(tapBpm) : "—";
+  }
+
+  /* ---------- interfaccia ---------- */
+  var ui = { tab: "detect", listId: null, form: null, formErr: "", confirm: null, newName: "", live: null };
+
+  function detectView() {
+    var has = det.running && det.bpm > 0;
+    var msg = det.error
+      ? '<p class="msg err">' + esc(det.error) + "</p>"
+      : '<p class="msg">Appoggia il telefono vicino alla batteria e suona un groove costante. Il tempo si stabilizza in 3–5 secondi.</p>';
+    var ranges = [60, 80, 100].map(function (v) {
+      return '<button data-act="range" data-v="' + v + '" aria-pressed="' + (det.minBPM === v) + '">' + v + "–" + v * 2 + "</button>";
+    }).join("");
+    return '<h1>Batteria BPM</h1>' +
+      '<section class="hero"><div id="bpmNum" class="bpm" aria-live="polite">' + (has ? Math.round(det.bpm) : "—") + '</div>' +
+      '<div class="unit">BPM</div>' +
+      '<div class="meter"><i id="lvl"></i></div>' +
+      '<div id="conf" class="small">' + (has ? "Affidabilità " + Math.round(det.conf * 100) + "%" : "") + "</div></section>" +
+      '<div><div class="label">Intervallo di tempo atteso</div><div class="seg">' + ranges + "</div></div>" +
+      '<button class="btn primary big' + (det.running ? " stop" : "") + '" data-act="toggle">' + (det.running ? "Ferma" : "Avvia rilevamento") + "</button>" +
+      msg +
+      '<section class="card tap"><div><div class="label">Tap tempo</div><div id="tapNum" class="tap-num">' + (tapBpm ? Math.round(tapBpm) : "—") + '</div>' +
+      '<div class="small">Tocca a tempo, senza microfono.</div></div>' +
+      '<button class="pad" data-act="tap" aria-label="Tap tempo">TAP</button></section>';
+  }
+
+  function listsView() {
+    var rows = state.playlists.map(function (p) {
+      var del = ui.confirm === "l" + p.id;
+      return '<div class="row"><button class="open" data-act="open" data-id="' + p.id + '"><div class="t">' + esc(p.name) +
+        (p.example ? ' <span class="pill">esempio</span>' : "") + '</div><div class="small">' + p.songs.length + " brani</div></button>" +
+        '<button class="btn sm danger" data-act="dellist" data-id="' + p.id + '">' + (del ? "Elimina?" : "Elimina") + "</button></div>";
+    }).join("");
+    return "<h1>Scalette</h1>" +
+      (rows ? '<div class="rows">' + rows + "</div>" : '<p class="msg">Nessuna scaletta. Creane una qui sotto.</p>') +
+      '<form class="card form" data-form="newlist"><label class="label" for="newName">Nuova scaletta</label>' +
+      '<input id="newName" data-nn="1" value="' + esc(ui.newName) + '" placeholder="Es. Concerto sabato" autocomplete="off">' +
+      '<button class="btn primary" type="submit">Crea scaletta</button></form>';
+  }
+
+  function formView() {
+    var f = ui.form;
+    var has = det.running && det.bpm > 0;
+    return '<form class="card form" data-form="song"><div class="label">' + (f.id ? "Modifica brano" : "Nuovo brano") + "</div>" +
+      '<input id="f-title" data-f="title" value="' + esc(f.title) + '" placeholder="Titolo" autocomplete="off">' +
+      '<input id="f-artist" data-f="artist" value="' + esc(f.artist) + '" placeholder="Artista" autocomplete="off">' +
+      '<input id="f-bpm" data-f="bpm" value="' + esc(f.bpm) + '" placeholder="BPM (30–300)" inputmode="numeric" autocomplete="off">' +
+      '<button type="button" class="btn sm" id="useDet" data-act="usedet"' + (has ? "" : " hidden") + ">Usa il BPM che suoni (" + Math.round(det.bpm) + ")</button>" +
+      '<textarea id="f-notes" data-f="notes" placeholder="Note: struttura, stacchi, pause…">' + esc(f.notes) + "</textarea>" +
+      (ui.formErr ? '<p class="msg err">' + esc(ui.formErr) + "</p>" : "") +
+      '<div class="actions"><button class="btn primary" type="submit">Salva</button><button type="button" class="btn" data-act="cancelform">Annulla</button></div></form>';
+  }
+
+  function detailView() {
+    var p = listById(ui.listId);
+    if (!p) { ui.listId = null; return listsView(); }
+    var rows = p.songs.map(function (s, i) {
+      var del = ui.confirm === "s" + s.id;
+      return '<div class="row"><div class="grow"><div class="t">' + esc(s.title) + "</div>" +
+        (s.artist ? '<div class="small">' + esc(s.artist) + "</div>" : "") +
+        (s.notes ? '<div class="small">' + esc(s.notes) + "</div>" : "") +
+        '<div class="actions" style="margin-top:8px">' +
+        '<button class="btn sm" data-act="up" data-id="' + s.id + '"' + (i === 0 ? " disabled" : "") + ' aria-label="Sposta su">↑</button>' +
+        '<button class="btn sm" data-act="down" data-id="' + s.id + '"' + (i === p.songs.length - 1 ? " disabled" : "") + ' aria-label="Sposta giù">↓</button>' +
+        '<button class="btn sm" data-act="editsong" data-id="' + s.id + '">Modifica</button>' +
+        '<button class="btn sm danger" data-act="delsong" data-id="' + s.id + '">' + (del ? "Elimina?" : "Elimina") + "</button></div></div>" +
+        '<div class="num">' + s.bpm + "<small>BPM</small></div></div>";
+    }).join("");
+    return '<div class="toolbar"><button class="btn sm" data-act="back">← Scalette</button><span class="spacer"></span></div>' +
+      "<h2>" + esc(p.name) + "</h2>" +
+      '<div class="toolbar"><button class="btn primary sm" data-act="live"' + (p.songs.length ? "" : " disabled") + '>Modalità live</button>' +
+      '<button class="btn sm" data-act="addsong">+ Brano</button>' +
+      '<button class="btn sm" data-act="sort" data-dir="asc">BPM ↑</button>' +
+      '<button class="btn sm" data-act="sort" data-dir="desc">BPM ↓</button></div>' +
+      (ui.form ? formView() : "") +
+      (rows ? '<div class="rows">' + rows + "</div>" : '<p class="msg">Nessun brano. Tocca “+ Brano” per aggiungerne uno.</p>');
+  }
+
+  function render() {
+    document.getElementById("tab-detect").setAttribute("aria-current", ui.tab === "detect" ? "page" : "false");
+    document.getElementById("tab-lists").setAttribute("aria-current", ui.tab === "lists" ? "page" : "false");
+    app.innerHTML = ui.tab === "detect" ? detectView() : (ui.listId ? detailView() : listsView());
+    var m = document.getElementById("lvl");
+    if (m) m.style.width = Math.min(det.level * 5, 1) * 100 + "%";
+  }
+  function refresh() { render(); if (ui.live) renderLive(); }
+
+  /* ---------- modalità live ---------- */
+  function renderLive() {
+    var l = ui.live && listById(ui.live.listId);
+    if (!l || !l.songs.length) { closeLive(); return; }
+    var i = Math.min(ui.live.index, l.songs.length - 1);
+    var s = l.songs[i];
+    var has = det.running && det.bpm > 0;
+    var d = Math.round(det.bpm) - s.bpm, ad = Math.abs(d);
+    var cls = !has ? "c-mute" : ad <= 2 ? "c-ok" : ad <= 6 ? "c-warn" : "c-bad";
+    var fb = !has ? (det.running ? "Suona per iniziare…" : "Rilevamento fermo")
+      : d > 2 ? "Stai correndo (+" + d + ")" : d < -2 ? "Stai rallentando (" + d + ")" : "In tempo ✓";
+    liveEl.innerHTML = '<div class="live"><div class="top"><button class="btn sm" data-act="liveclose">Chiudi</button>' +
+      '<span class="small">' + (i + 1) + " / " + l.songs.length + "</span></div>" +
+      '<div class="mid"><div><div class="title">' + esc(s.title) + "</div>" +
+      (s.artist ? '<div class="small">' + esc(s.artist) + "</div>" : "") + "</div>" +
+      '<div class="pair"><div><div class="label">Target</div><div class="big">' + s.bpm + "</div></div>" +
+      '<div><div class="label">Tu</div><div class="big ' + cls + '">' + (has ? Math.round(det.bpm) : "—") + "</div></div></div>" +
+      '<div class="fb ' + cls + '">' + fb + "</div>" +
+      '<div class="meter" style="margin:0 12%"><i id="liveLvl" style="width:' + Math.min(det.level * 5, 1) * 100 + '%"></i></div>' +
+      (s.notes ? '<div class="notes">' + esc(s.notes) + "</div>" : "") + "</div>" +
+      '<div class="ctrl"><button class="btn" data-act="prev"' + (i === 0 ? " disabled" : "") + ' aria-label="Brano precedente">◀</button>' +
+      '<button class="btn primary' + (det.running ? "" : " stop") + '" data-act="toggle">' + (det.running ? "Microfono attivo" : "Avvia microfono") + "</button>" +
+      '<button class="btn" data-act="next"' + (i >= l.songs.length - 1 ? " disabled" : "") + ' aria-label="Brano successivo">▶</button></div>' +
+      (det.error ? '<p class="msg err">' + esc(det.error) + "</p>" : "") + "</div>";
+  }
+  function openLive(listId) {
+    ui.live = { listId: listId, index: 0 };
+    liveEl.hidden = false;
+    adaptRange();
+    renderLive();
+    if (!det.running) startDet();
+  }
+  function closeLive() { ui.live = null; liveEl.hidden = true; liveEl.innerHTML = ""; }
+  function adaptRange() {
+    var l = ui.live && listById(ui.live.listId);
+    if (l && l.songs[ui.live.index]) setMin(l.songs[ui.live.index].bpm * 0.7);
+  }
+
+  /* ---------- azioni ---------- */
+  function moveSong(list, id, dir) {
+    var i = list.songs.findIndex(function (s) { return s.id === id; });
+    var j = i + dir;
+    if (i < 0 || j < 0 || j >= list.songs.length) return;
+    var t = list.songs[i]; list.songs[i] = list.songs[j]; list.songs[j] = t;
+  }
+  function onClick(e) {
+    var el = e.target.closest("[data-act]");
+    if (!el) return;
+    var act = el.dataset.act, id = el.dataset.id, p = ui.listId ? listById(ui.listId) : null;
+    if (act !== "dellist" && act !== "delsong") ui.confirm = null;
+    switch (act) {
+      case "tab": ui.tab = el.dataset.v; ui.listId = null; ui.form = null; render(); window.scrollTo(0, 0); break;
+      case "toggle": det.running ? stopDet() : startDet(); break;
+      case "range": setMin(Number(el.dataset.v)); render(); break;
+      case "tap": tap(); break;
+      case "open": ui.listId = id; ui.form = null; render(); window.scrollTo(0, 0); break;
+      case "back": ui.listId = null; ui.form = null; render(); break;
+      case "dellist":
+        if (ui.confirm === "l" + id) { state.playlists = state.playlists.filter(function (x) { return x.id !== id; }); ui.confirm = null; save(); }
+        else ui.confirm = "l" + id;
+        render(); break;
+      case "addsong": ui.form = { id: null, title: "", artist: "", bpm: "", notes: "" }; ui.formErr = ""; render(); break;
+      case "editsong":
+        var s = p.songs.filter(function (x) { return x.id === id; })[0];
+        ui.form = { id: s.id, title: s.title, artist: s.artist, bpm: String(s.bpm), notes: s.notes }; ui.formErr = ""; render(); break;
+      case "cancelform": ui.form = null; render(); break;
+      case "usedet": ui.form.bpm = String(Math.round(det.bpm)); var b = document.getElementById("f-bpm"); if (b) b.value = ui.form.bpm; break;
+      case "delsong":
+        if (ui.confirm === "s" + id) { p.songs = p.songs.filter(function (x) { return x.id !== id; }); ui.confirm = null; save(); }
+        else ui.confirm = "s" + id;
+        render(); break;
+      case "up": moveSong(p, id, -1); save(); render(); break;
+      case "down": moveSong(p, id, 1); save(); render(); break;
+      case "sort":
+        var asc = el.dataset.dir === "asc";
+        p.songs.sort(function (a, b2) { return asc ? a.bpm - b2.bpm : b2.bpm - a.bpm; });
+        save(); render(); break;
+      case "live": openLive(ui.listId); break;
+      case "liveclose": closeLive(); break;
+      case "prev": if (ui.live.index > 0) { ui.live.index--; adaptRange(); renderLive(); } break;
+      case "next": var ll = listById(ui.live.listId); if (ui.live.index < ll.songs.length - 1) { ui.live.index++; adaptRange(); renderLive(); } break;
+    }
+  }
+  function onInput(e) {
+    var t = e.target;
+    if (t.dataset.f && ui.form) ui.form[t.dataset.f] = t.value;
+    if (t.dataset.nn) ui.newName = t.value;
+  }
+  function onSubmit(e) {
+    e.preventDefault();
+    var kind = e.target.dataset.form;
+    if (kind === "newlist") {
+      var name = ui.newName.trim() || "Nuova scaletta";
+      state.playlists.push({ id: uid(), name: name, songs: [] });
+      ui.newName = ""; save(); render();
+    } else if (kind === "song") {
+      var f = ui.form, bpm = parseInt(f.bpm, 10), p = listById(ui.listId);
+      if (!f.title.trim()) { ui.formErr = "Scrivi il titolo del brano."; render(); return; }
+      if (!(bpm >= 30 && bpm <= 300)) { ui.formErr = "Il BPM deve essere un numero tra 30 e 300."; render(); return; }
+      var data = { title: f.title.trim(), artist: f.artist.trim(), bpm: bpm, notes: f.notes };
+      if (f.id) {
+        p.songs.forEach(function (s) { if (s.id === f.id) { s.title = data.title; s.artist = data.artist; s.bpm = data.bpm; s.notes = data.notes; } });
+      } else {
+        data.id = uid(); p.songs.push(data);
+      }
+      ui.form = null; ui.formErr = ""; save(); render();
+    }
+  }
+  document.addEventListener("click", onClick);
+  document.addEventListener("input", onInput);
+  document.addEventListener("submit", onSubmit);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && det.running && det.ctx && det.ctx.state === "suspended") det.ctx.resume();
+  });
+
+  render();
+})();
+</script>
