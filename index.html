@@ -1,5 +1,11 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-title" content="Batteria BPM">
+<style>html{color-scheme:light}:root{padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Batteria BPM</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f1317">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap">
@@ -126,6 +132,8 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
 @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
 </style>
 
+</head>
+<body>
 <main id="app"></main>
 <nav class="tabs" aria-label="Sezioni">
   <button data-act="tab" data-v="detect" id="tab-detect">Rileva</button>
@@ -545,3 +553,5 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
   render();
 })();
 </script>
+</body>
+</html>
