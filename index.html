@@ -129,7 +129,17 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
 .live .ctrl { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 10px; }
 .live .ctrl .btn { padding: 16px 0; font-size: 1.1rem; }
 .c-ok { color: var(--ok); } .c-warn { color: var(--warn); } .c-bad { color: var(--bad); } .c-mute { color: var(--muted); }
-@media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .meter i { transition: none; } .pulse { transition: none !important; } }
+.metro-top { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 12px; }
+.pulse { width: 84px; height: 84px; border-radius: 50%; background: var(--fg); opacity: .12; }
+.m-bpm { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.m-bpm input { width: 5.2ch; font-family: var(--font-display); font-weight: 700; font-size: 2.6rem; line-height: 1; background: transparent; border: 0; border-bottom: 2px solid var(--line); border-radius: 0; color: var(--fg); padding: 0; font-variant-numeric: tabular-nums; }
+.beats { display: flex; gap: 10px; justify-content: center; margin: 6px 0 14px; }
+.beats i { flex: 1; max-width: 64px; height: 14px; border-radius: 99px; background: var(--line); }
+.beats i.on { background: var(--fg); }
+.beats i.on.first { background: var(--accent); }
+.beats.big i { height: 22px; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
 </style>
 
 </head>
@@ -350,8 +360,172 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
     if (el) el.textContent = tapBpm ? Math.round(tapBpm) : "—";
   }
 
+  /* ---------- metronomo visivo ---------- */
+  var metro = { running: false, bpm: 100, beats: 4, beat: -1, next: 0, timer: null, wake: null, fromLive: false };
+  function clampBpm(v) { return Math.max(30, Math.min(300, Math.round(v))); }
+  function setMetroBpm(v) {
+    metro.bpm = clampBpm(v);
+    var el = document.getElementById("mBpm");
+    if (el) el.value = metro.bpm;
+  }
+  function beatsHtml(big) {
+    var h = '<div class="beats' + (big ? " big" : "") + '" aria-hidden="true">';
+    for (var i = 0; i < metro.beats; i++) h += "<i></i>";
+    return h + "</div>";
+  }
+  function paintBeats() {
+    var rows = document.querySelectorAll(".beats");
+    for (var r = 0; r < rows.length; r++) {
+      var kids = rows[r].children;
+      for (var i = 0; i < kids.length; i++) {
+        kids[i].className = metro.running && i === metro.beat ? "on" + (i === 0 ? " first" : "") : "";
+      }
+    }
+  }
+  function flashPulse() {
+    var ps = document.querySelectorAll(".pulse");
+    for (var i = 0; i < ps.length; i++) {
+      var el = ps[i];
+      el.style.background = metro.beat === 0 ? "var(--accent)" : "var(--fg)";
+      el.style.transition = "none";
+      el.style.opacity = "1";
+      void el.offsetWidth;
+      el.style.transition = "opacity .3s ease-out";
+      el.style.opacity = ".12";
+    }
+  }
+  function metroTick() {
+    var now = performance.now();
+    if (now - metro.next > 1000) metro.next = now;
+    while (now >= metro.next) {
+      metro.beat = (metro.beat + 1) % metro.beats;
+      metro.next += 60000 / metro.bpm;
+      paintBeats();
+      flashPulse();
+    }
+  }
+  function metroStart() {
+    if (metro.running) return;
+    metro.running = true;
+    metro.beat = -1;
+    metro.next = performance.now() + 30;
+    metro.timer = setInterval(metroTick, 15);
+    try {
+      if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (w) { metro.wake = w; }, function () {});
+    } catch (e) {}
+  }
+  function metroStop() {
+    if (!metro.running) return;
+    clearInterval(metro.timer);
+    metro.running = false; metro.beat = -1; metro.fromLive = false;
+    try { if (metro.wake) metro.wake.release(); } catch (e) {}
+    metro.wake = null;
+    paintBeats();
+  }
+  function metroFollow() {
+    var l = ui.live && listById(ui.live.listId);
+    if (metro.running && metro.fromLive && l && l.songs[ui.live.index]) setMetroBpm(l.songs[ui.live.index].bpm);
+  }
+  function metroCard() {
+    var hasDet = det.running && det.bpm > 0;
+    var seg = [3, 4, 6].map(function (v) {
+      return '<button data-act="mbeats" data-v="' + v + '" aria-pressed="' + (metro.beats === v) + '">' + v + " battiti</button>";
+    }).join("");
+    return '<section class="card"><div class="label">Metronomo visivo</div>' +
+      '<div class="metro-top"><div class="pulse" aria-hidden="true"></div>' +
+      '<div class="m-bpm"><input id="mBpm" value="' + metro.bpm + '" inputmode="numeric" aria-label="BPM del metronomo" autocomplete="off">' +
+      '<span class="unit" style="letter-spacing:.15em">BPM</span></div></div>' +
+      beatsHtml(false) +
+      '<div class="stack">' +
+      '<div class="actions"><button class="btn sm" data-act="mchg" data-d="-5">−5</button><button class="btn sm" data-act="mchg" data-d="-1">−1</button>' +
+      '<button class="btn sm" data-act="mchg" data-d="1">+1</button><button class="btn sm" data-act="mchg" data-d="5">+5</button></div>' +
+      '<div class="seg">' + seg + "</div>" +
+      '<button class="btn primary' + (metro.running ? " stop" : "") + '" data-act="mtoggle">' + (metro.running ? "Ferma metronomo" : "Avvia metronomo") + "</button>" +
+      '<div class="actions"><button class="btn sm" data-act="mdet"' + (hasDet ? "" : " disabled") + ">Usa BPM rilevato</button>" +
+      '<button class="btn sm" data-act="mtap"' + (tapBpm ? "" : " disabled") + ">Usa tap tempo</button></div>" +
+      '<p class="small" style="margin:0">Solo luce, nessun suono: non disturba il microfono.</p></div></section>';
+  }
+
+  /* ---------- esporta e importa scalette ---------- */
+  function cleanId(v) {
+    var c = typeof v === "string" ? v.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40) : "";
+    return c || uid();
+  }
+  function dataCard() {
+    return '<section class="card"><div class="label">Trasferisci le scalette</div>' +
+      '<div class="actions"><button class="btn sm" data-act="export">Esporta file</button>' +
+      '<button class="btn sm" data-act="import">Importa file</button></div>' +
+      '<input type="file" id="importFile" accept=".json,application/json" hidden>' +
+      (ui.dataMsg ? '<p class="msg" style="margin-top:10px" role="status">' + esc(ui.dataMsg) + "</p>" : "") +
+      '<p class="small" style="margin:10px 0 0">Esporta salva tutte le scalette in un file. Su un altro dispositivo apri la stessa pagina e usa Importa: le scalette del file si aggiungono a quelle che hai, e una già presente viene aggiornata.</p></section>';
+  }
+  function doExport() {
+    var data = { app: "batteria-bpm", version: 1, exportedAt: new Date().toISOString(), playlists: state.playlists };
+    var json = JSON.stringify(data, null, 2);
+    var name = "scalette-batteria-bpm-" + new Date().toISOString().slice(0, 10) + ".json";
+    function download() {
+      try {
+        var url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+        var a = document.createElement("a");
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        ui.dataMsg = "File creato: " + name;
+      } catch (err) { ui.dataMsg = "Non riesco a creare il file su questo browser."; }
+      render();
+    }
+    try {
+      if (/iPhone|iPad|Android/i.test(navigator.userAgent) && navigator.canShare) {
+        var file = new File([json], name, { type: "application/json" });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: "Scalette Batteria BPM" }).then(function () {
+            ui.dataMsg = "Scalette condivise."; render();
+          }, function (err) { if (!err || err.name !== "AbortError") download(); });
+          return;
+        }
+      }
+    } catch (err) {}
+    download();
+  }
+  function readImport(file) {
+    if (!file) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var obj = JSON.parse(rd.result);
+        var arr = Array.isArray(obj) ? obj : obj && obj.playlists;
+        if (!Array.isArray(arr)) throw new Error("formato");
+        var lists = 0, songs = 0;
+        arr.forEach(function (p) {
+          if (!p || typeof p.name !== "string" || !Array.isArray(p.songs)) return;
+          var clean = { id: cleanId(p.id), name: p.name.slice(0, 100), songs: [] };
+          p.songs.forEach(function (s) {
+            var bpm = Math.round(Number(s && s.bpm));
+            if (!s || typeof s.title !== "string" || !s.title.trim() || !(bpm >= 30 && bpm <= 300)) return;
+            clean.songs.push({
+              id: cleanId(s.id), title: s.title.slice(0, 200),
+              artist: typeof s.artist === "string" ? s.artist.slice(0, 200) : "",
+              bpm: bpm, notes: typeof s.notes === "string" ? s.notes.slice(0, 2000) : ""
+            });
+          });
+          var idx = state.playlists.findIndex(function (x) { return x.id === clean.id; });
+          if (idx >= 0) state.playlists[idx] = clean; else state.playlists.push(clean);
+          lists++; songs += clean.songs.length;
+        });
+        if (!lists) throw new Error("vuoto");
+        save();
+        ui.dataMsg = "Importate " + lists + (lists === 1 ? " scaletta" : " scalette") + " (" + songs + " brani).";
+      } catch (err) {
+        ui.dataMsg = "Il file non è valido: scegli un file esportato da questa app.";
+      }
+      render();
+    };
+    rd.onerror = function () { ui.dataMsg = "Non riesco a leggere il file."; render(); };
+    rd.readAsText(file);
+  }
+
   /* ---------- interfaccia ---------- */
-  var ui = { tab: "detect", listId: null, form: null, formErr: "", confirm: null, newName: "", live: null };
+  var ui = { dataMsg: "", tab: "detect", listId: null, form: null, formErr: "", confirm: null, newName: "", live: null };
 
   function detectView() {
     var has = det.running && det.bpm > 0;
@@ -371,7 +545,7 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
       msg +
       '<section class="card tap"><div><div class="label">Tap tempo</div><div id="tapNum" class="tap-num">' + (tapBpm ? Math.round(tapBpm) : "—") + '</div>' +
       '<div class="small">Tocca a tempo, senza microfono.</div></div>' +
-      '<button class="pad" data-act="tap" aria-label="Tap tempo">TAP</button></section>';
+      '<button class="pad" data-act="tap" aria-label="Tap tempo">TAP</button></section>' + metroCard();
   }
 
   function listsView() {
@@ -385,7 +559,7 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
       (rows ? '<div class="rows">' + rows + "</div>" : '<p class="msg">Nessuna scaletta. Creane una qui sotto.</p>') +
       '<form class="card form" data-form="newlist"><label class="label" for="newName">Nuova scaletta</label>' +
       '<input id="newName" data-nn="1" value="' + esc(ui.newName) + '" placeholder="Es. Concerto sabato" autocomplete="off">' +
-      '<button class="btn primary" type="submit">Crea scaletta</button></form>';
+      '<button class="btn primary" type="submit">Crea scaletta</button></form>' + dataCard();
   }
 
   function formView() {
@@ -432,6 +606,7 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
     app.innerHTML = ui.tab === "detect" ? detectView() : (ui.listId ? detailView() : listsView());
     var m = document.getElementById("lvl");
     if (m) m.style.width = Math.min(det.level * 5, 1) * 100 + "%";
+    paintBeats();
   }
   function refresh() { render(); if (ui.live) renderLive(); }
 
@@ -458,7 +633,10 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
       '<div class="ctrl"><button class="btn" data-act="prev"' + (i === 0 ? " disabled" : "") + ' aria-label="Brano precedente">◀</button>' +
       '<button class="btn primary' + (det.running ? "" : " stop") + '" data-act="toggle">' + (det.running ? "Microfono attivo" : "Avvia microfono") + "</button>" +
       '<button class="btn" data-act="next"' + (i >= l.songs.length - 1 ? " disabled" : "") + ' aria-label="Brano successivo">▶</button></div>' +
+      '<button class="btn" data-act="metrolive">' + (metro.running ? "Ferma metronomo visivo" : "Metronomo visivo a " + s.bpm + " BPM") + "</button>" +
+      (metro.running ? beatsHtml(true) : "") +
       (det.error ? '<p class="msg err">' + esc(det.error) + "</p>" : "") + "</div>";
+    paintBeats();
   }
   function openLive(listId) {
     ui.live = { listId: listId, index: 0 };
@@ -467,7 +645,7 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
     renderLive();
     if (!det.running) startDet();
   }
-  function closeLive() { ui.live = null; liveEl.hidden = true; liveEl.innerHTML = ""; }
+  function closeLive() { if (metro.fromLive) metroStop(); ui.live = null; liveEl.hidden = true; liveEl.innerHTML = ""; }
   function adaptRange() {
     var l = ui.live && listById(ui.live.listId);
     if (l && l.songs[ui.live.index]) setMin(l.songs[ui.live.index].bpm * 0.7);
@@ -490,6 +668,17 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
       case "toggle": det.running ? stopDet() : startDet(); break;
       case "range": setMin(Number(el.dataset.v)); render(); break;
       case "tap": tap(); break;
+      case "mtoggle": metro.running ? metroStop() : metroStart(); render(); break;
+      case "mchg": setMetroBpm(metro.bpm + Number(el.dataset.d)); break;
+      case "mbeats": metro.beats = Number(el.dataset.v); if (metro.beat >= metro.beats) metro.beat = 0; render(); break;
+      case "mdet": setMetroBpm(det.bpm); break;
+      case "mtap": setMetroBpm(tapBpm); break;
+      case "metrolive":
+        if (metro.running) { metroStop(); }
+        else { setMetroBpm(listById(ui.live.listId).songs[ui.live.index].bpm); metroStart(); metro.fromLive = true; }
+        renderLive(); break;
+      case "export": doExport(); break;
+      case "import": var inp = document.getElementById("importFile"); if (inp) inp.click(); break;
       case "open": ui.listId = id; ui.form = null; render(); window.scrollTo(0, 0); break;
       case "back": ui.listId = null; ui.form = null; render(); break;
       case "dellist":
@@ -514,8 +703,8 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
         save(); render(); break;
       case "live": openLive(ui.listId); break;
       case "liveclose": closeLive(); break;
-      case "prev": if (ui.live.index > 0) { ui.live.index--; adaptRange(); renderLive(); } break;
-      case "next": var ll = listById(ui.live.listId); if (ui.live.index < ll.songs.length - 1) { ui.live.index++; adaptRange(); renderLive(); } break;
+      case "prev": if (ui.live.index > 0) { ui.live.index--; adaptRange(); metroFollow(); renderLive(); } break;
+      case "next": var ll = listById(ui.live.listId); if (ui.live.index < ll.songs.length - 1) { ui.live.index++; adaptRange(); metroFollow(); renderLive(); } break;
     }
   }
   function onInput(e) {
@@ -545,6 +734,11 @@ nav.tabs button[aria-current="page"] { background: var(--fg); color: var(--bg); 
   }
   document.addEventListener("click", onClick);
   document.addEventListener("input", onInput);
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (t.id === "importFile") { readImport(t.files && t.files[0]); t.value = ""; }
+    else if (t.id === "mBpm") { var v = parseInt(t.value, 10); setMetroBpm(v > 0 ? v : metro.bpm); }
+  });
   document.addEventListener("submit", onSubmit);
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden && det.running && det.ctx && det.ctx.state === "suspended") det.ctx.resume();
